@@ -50,6 +50,23 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
+
+		<!--pra aprender mais https://projectlombok.org/-->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<version>1.18.12</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<annotationProcessorPaths>
+			<path>
+				<groupId>org.projectlombok</groupId>
+				<artifactId>lombok</artifactId>
+				<version>1.18.12</version>
+			</path>
+		</annotationProcessorPaths>
+
 	</dependencies>
 
 	<build>

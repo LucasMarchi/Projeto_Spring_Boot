@@ -2,72 +2,79 @@ package br.com.bandtec.JPA1.controllers;
 
 import br.com.bandtec.JPA1.entidades.Esporte;
 import br.com.bandtec.JPA1.repositorios.EsporteRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import java.net.URI;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Optional;
 
 @RestController
 @RequestMapping("/esportes")
-public class EsporteController {
+public final class EsporteController {
 
-    @Autowired // isso injeta uma instancia do EsporteRepository, no caso...
-    private EsporteRepository repository;
+    /*por quê final? tem uma galera, principalmente quem mexe com programação funcional que preza pela imutabilidade
+    isso ajuda a deixar a programação mais previsível pois sabemos que a referência do objeto não vai mudar, então uma função aplicada a esse objeto
+    sempre terá o mesmo retorno
+
+    Esse artigo do uncle Bob é bem legal e incentiva a aproveitar o melhor da programação orientada a objetos e da programação funcional
+    https://blog.cleancoder.com/uncle-bob/2018/04/13/FPvsOO.html
+    */
+    private final EsporteRepository repository;
+
+    //Injeção de dependências com autowired não é mais recomendado pela galera do Spring, o recomendado é a injeção via construtor
+    public EsporteController(final EsporteRepository repository) {
+        this.repository = repository;
+    }
 
 
     @PostMapping
-    public ResponseEntity criarEsporte(@RequestBody Esporte novoEsporte) {
-        this.repository.save(novoEsporte);
-
-        return ResponseEntity.created(null).build();
+    public ResponseEntity criarEsporte(final @RequestBody Esporte novoEsporte) {
+        final Esporte esporte = this.repository.save(novoEsporte);
         // o null seria a URL do recurso recem criado
+        // talvez seja interessante devolver a entidade persistida
+        return ResponseEntity.created(null).body(esporte);
     }
 
     @GetMapping
     public ResponseEntity listaTodos() {
-        if (this.repository.count() > 0) {
-            return ResponseEntity.ok(this.repository.findAll()); // status 200
-        } else {
-            return ResponseEntity.noContent().build(); // status 204 = no content
-        }
+        final List<Esporte> esportes = this.repository.findAll();
+        return !CollectionUtils.isEmpty(esportes)
+            ? ResponseEntity.ok(esportes)
+            : ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity getEsporte(@PathVariable Integer id) {
+    public ResponseEntity getEsporte(final @PathVariable Integer id) {
         // o findAll() não retorna o obj.Ele retorna Um Optional da class Entidade
         // isso serve para previnir NullPointerException
-        Optional<Esporte> consultaEsporte = this.repository.findById(id);
-        if (consultaEsporte.isPresent()) {
-            // o get() do Optional traz o valor em si (no caso, um esporte)
-            return ResponseEntity.ok(consultaEsporte.get());
-        } else { // se o isPresente retornar false, sig que a consulta nao trouxe
-            return ResponseEntity.notFound().build();
-        }
+
+        // justamente por ter o recurso do optional, podemos seguir aqui um estilo mais funcional de programação em java
+        return this.repository.findById(id)
+            .map(ResponseEntity::ok)// equivalente a: esporte -> ResponseEntity.ok(esporte)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity excluirEsporte(@PathVariable Integer id) {
-        if (this.repository.existsById(id)) {// verifica se ele existe no banco e caso sim ele
-            //existe se nao ele fala que nao tem
-            this.repository.deleteById(id);
-            return ResponseEntity.ok().build(); // 200 ok
-        } else {
-            return ResponseEntity.notFound().build(); // 404 no-found (nao encontrado)
-        }
+    public ResponseEntity excluirEsporte(final @PathVariable Integer id) {
+        return this.repository.findById(id)
+            .map(esporte -> {
+              repository.deleteById(id);
+              return ResponseEntity.ok().build();
+            }).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity atualizarEsporte(@PathVariable Integer id, @RequestBody Esporte esporteAtualizado) {
-        Optional<Esporte> consultaExistente = this.repository.findById(id);
-        if (consultaExistente.isPresent()) {
-            Esporte esporteEncontrado = consultaExistente.get();
-            esporteEncontrado.setNome(esporteAtualizado.getNome());
-            esporteEncontrado.setOlimpico(esporteAtualizado.isOlimpico());
-            this.repository.save(esporteEncontrado);
-            return ResponseEntity.ok().build(); // status 200
-        } else {
-            return ResponseEntity.notFound().build(); // status 404
-        }
+    public ResponseEntity atualizarEsporte(final @PathVariable Integer id, final  @RequestBody Esporte esporteAtualizado) {
+        return this.repository.findById(id)
+            .map(esporte -> Esporte.builder() //aqui entra um pouco da imutabilidade, não atualizei o objeto, criei outro a partir do objeto existente, o pattern Builder é bem legal pra isso
+                .id(esporte.getId())
+                .nome(esporteAtualizado.getNome())
+                .olimpico(esporteAtualizado.isOlimpico())
+                .build())
+            .map(repository::save)
+            .map(esporte -> ResponseEntity.ok().build())
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }
